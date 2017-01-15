@@ -25,12 +25,12 @@ def main():
         chainer.cuda.get_device(args.gpu).use()
         model.to_gpu()
 
-    reports = train_cifar10(model, batchsize=args.batchsize, iter_=args.iter*1000, device=args.gpu, verbose=True)
+    reports = train_cifar10(model, batchsize=args.batchsize, iter_=args.iter*1000, device=args.gpu, warm_up=args.warmup, verbose=True)
 
     if not os.path.isdir(args.out):
         os.makedirs(args.out)
 
-    with open("result_resnet{}/log.json".format(args.out), "w") as f:
+    with open("{}/log.json".format(args.out), "w") as f:
         json.dump(reports, f)
 
 def parse_args():
@@ -45,6 +45,8 @@ def parse_args():
                         help='Directory to output the result')
     parser.add_argument('--n', '-n', type=int, default=3,
                         help='The model will have 6n+2 layers')
+    parser.add_argument('--warmup', '-w', action='store_true',
+                        help='Warm up with lr=0.01')
     args = parser.parse_args()
     if args.out is None:
         args.out = "result_resnet{}".format(args.n*6 + 2)

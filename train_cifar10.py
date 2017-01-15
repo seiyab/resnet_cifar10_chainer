@@ -10,7 +10,7 @@ from chainer import datasets, Variable
 from chainer.dataset import convert
 import chainer
 
-def train_cifar10(model, batchsize=128, iter_=64000, device=-1, verbose=False):
+def train_cifar10(model, batchsize=128, iter_=64000, device=-1, warm_up=False, verbose=False):
     optimizer = chainer.optimizers.MomentumSGD(lr=0.1)
     optimizer.setup(model)
     optimizer.add_hook(chainer.optimizer.WeightDecay(0.0001))
@@ -25,8 +25,15 @@ def train_cifar10(model, batchsize=128, iter_=64000, device=-1, verbose=False):
     train_iter = chainer.iterators.SerialIterator(train, batchsize)
 
     reports = []
-    divide_schedule = [32000, 48000]
+    if not warm_up:
+        lr_schedule = [(0, 0.1), (32000, 0.01), (48000, 0.001), (-1,)]
+    else:
+        lr_schedule = [(0, 0.01), (400, 0.1), (32000, 0.01), (48000, 0.001), (-1,)]
+    lr_change = lr_schedule.pop(0)
     for i, batch in enumerate(train_iter):
+        if i==lr_change[0]:
+            optimizer.lr = lr_change[1]
+            lr_change = lr_schedule.pop(0)
         if train_iter.is_new_epoch or i==0:
             test_iter = chainer.iterators.SerialIterator(test, batchsize, repeat=False, shuffle=False)
             reports.append(report(model, {"train":[batch], "test":test_iter}, i, train_iter.epoch, verbose=True, device=device))
@@ -35,10 +42,7 @@ def train_cifar10(model, batchsize=128, iter_=64000, device=-1, verbose=False):
         images = flip(crop(images_raw, device=device))
         optimizer.update(lambda x, t:softmax_cross_entropy(model(x), t), *(Variable(images), Variable(labels)))
 
-        if i in divide_schedule:
-            optimizer.lr /= 10
-
-        if i > iter_:
+        if i == iter_:
             test_iter = chainer.iterators.SerialIterator(test, batchsize, repeat=False, shuffle=False)
             reports.append(report(model, {"train":[batch], "test":test_iter}, i, train_iter.epoch, verbose=True, device=device))
             break
